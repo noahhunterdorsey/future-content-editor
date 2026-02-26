@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: '/', label: 'Library & Create' },
   { href: '/review', label: 'Review' },
   { href: '/approved', label: 'Approved' },
+  { href: '/brand-profile', label: 'Brand Profile' },
 ];
 
 export default function Navigation() {

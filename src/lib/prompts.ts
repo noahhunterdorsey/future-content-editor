@@ -16,7 +16,7 @@ REFERENCE AD STYLE ANALYSIS:
 - Multiple text blocks at different positions on the same image (top + bottom, or scattered across the frame) creating visual hierarchy
 - Large bold text for key stats and numbers ("3 million+"), smaller text for supporting copy
 - Deliberate line breaks at natural speech pauses, not auto-wrapped
-- Emojis used naturally (✅ 🌍 😏 🤝) — 1-3 per ad, not on every variation
+- No emojis — all copy must be clean text only, no emoji characters anywhere
 - Capitalization varies: ALL CAPS for feature lists, sentence case for storytelling
 - Pricing always front and center
 - Conversational Aussie tone — direct, confident, like a mate
@@ -33,7 +33,7 @@ RULES:
 - Mention speed of service in at least 2 of 5 variations
 - Generate realistic Aussie customer quotes — never include the customer's name (no "— Dave, Richmond" style attribution). Just the quote itself.
 - No hashtags ever
-- Use emojis naturally on some variations (not all)
+- Never use emojis — no emoji characters in on-image text, ad captions, or headlines
 - Direct response marketing — every word earns its place
 - Write with emotion
 - Always push toward a clear action
