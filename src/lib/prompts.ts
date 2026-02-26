@@ -12,7 +12,7 @@ ${JSON.stringify(brandProfile, null, 2)}
 REFERENCE AD STYLE ANALYSIS:
 - Text overlaid on warehouse/team photos using Instagram Stories-style formatting
 - Mix of pill backgrounds (solid rounded rectangles) and plain white text — varies by image area and creative intent
-- Per-line pill backgrounds sized to each line's text width, stacked flush with no gap between lines
+- Per-line pill backgrounds sized to each line's text width, stacked with a small ~6px gap between lines
 - Multiple text blocks at different positions on the same image (top + bottom, or scattered across the frame) creating visual hierarchy
 - Large bold text for key stats and numbers ("3 million+"), smaller text for supporting copy
 - Deliberate line breaks at natural speech pauses, not auto-wrapped

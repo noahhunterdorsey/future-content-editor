@@ -51,8 +51,8 @@ async function ensureInitialized() {
   if (!fontBoldBuffer) {
     const fontDir = path.join(process.cwd(), 'public', 'fonts');
     try {
-      fontBoldBuffer = fs.readFileSync(path.join(fontDir, 'Roboto-Bold.ttf'));
-      fontRegularBuffer = fs.readFileSync(path.join(fontDir, 'Roboto-Regular.ttf'));
+      fontBoldBuffer = fs.readFileSync(path.join(fontDir, 'Inter-Bold.ttf'));
+      fontRegularBuffer = fs.readFileSync(path.join(fontDir, 'Inter-Regular.ttf'));
     } catch {
       console.warn('Font files not found');
     }
@@ -178,8 +178,8 @@ export async function renderTextOnImage(
     const processedText = applyCapitalization(block.text, block.capitalization);
     const lines = processedText.split('\\n').flatMap((l: string) => l.split('\n'));
 
-    const paddingH = 16;
-    const paddingV = 8;
+    const paddingH = 20;
+    const paddingV = 12;
 
     const lineMeasurements = lines.map((line: string) => ({
       text: line,
@@ -190,9 +190,10 @@ export async function renderTextOnImage(
     // Calculate total height
     let totalHeight: number;
     const pillLineH = fontSize * 1.2 + paddingV * 2; // Each pill line height (text + top/bottom padding)
+    const pillGap = 6; // Gap between stacked pills matching reference ads
     if (block.style === 'pill') {
-      // Per-line pills with no gap — each line has its own pill, stacked flush
-      totalHeight = pillLineH * lines.length;
+      // Per-line pills with small gap between them
+      totalHeight = pillLineH * lines.length + pillGap * (lines.length - 1);
     } else {
       // Plain text: lines with normal spacing
       const plainLineGap = 6;
@@ -275,11 +276,11 @@ export async function renderTextOnImage(
         const textX = pillX + pillW / 2;
         const textY = currentY + pillLineH / 2;
 
-        const pillRadius = 10; // Slightly rounded corners, more squared up
+        const pillRadius = 20; // Rounded corners matching Instagram Stories style
         svgElements += `<rect x="${pillX}" y="${currentY}" width="${pillW}" height="${pillLineH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
-        svgElements += `<text x="${textX}" y="${textY}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="middle" dominant-baseline="central">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${textX}" y="${textY}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="middle" dominant-baseline="central">${escapeXml(line.text)}</text>`;
 
-        currentY += pillLineH; // No gap — pills stack flush
+        currentY += pillLineH + pillGap; // Small gap between stacked pills
       }
     } else {
       // Plain text with stroke outline for readability
@@ -299,9 +300,9 @@ export async function renderTextOnImage(
         const yPos = textY + fontSize * 0.85;
 
         // Dark outline for contrast (drawn first, behind white fill)
-        svgElements += `<text x="${lineX}" y="${yPos}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${lineX}" y="${yPos}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
         // White fill on top
-        svgElements += `<text x="${lineX}" y="${yPos}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${lineX}" y="${yPos}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
 
         textY += line.height + plainLineGap;
       }
@@ -321,7 +322,7 @@ export async function renderTextOnImage(
     font: {
       fontBuffers,
       loadSystemFonts: true,
-      defaultFontFamily: 'Roboto',
+      defaultFontFamily: 'Inter',
     },
   });
 
