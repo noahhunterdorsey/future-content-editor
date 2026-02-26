@@ -12,7 +12,7 @@ ${JSON.stringify(brandProfile, null, 2)}
 REFERENCE AD STYLE ANALYSIS:
 - Text overlaid on warehouse/team photos using Instagram Stories-style formatting
 - Mix of pill backgrounds (solid rounded rectangles) and plain white text — varies by image area and creative intent
-- Per-line pill backgrounds that hug text tightly
+- Combined pill background per text block — all lines within one block share a single rounded rectangle, like Instagram Stories
 - Multiple text blocks at different positions on the same image (top + bottom, or scattered across the frame) creating visual hierarchy
 - Large bold text for key stats and numbers ("3 million+"), smaller text for supporting copy
 - Deliberate line breaks at natural speech pauses, not auto-wrapped
@@ -45,6 +45,14 @@ IMAGE ANALYSIS:
 3. Rate busyness 1-5
 4. Determine if image is predominantly light or dark
 5. Identify specific areas that are light vs dark (for per-block pill color decisions)
+6. CRITICAL: Identify where all faces and heads appear in the image. Note their approximate vertical position as a percentage of image height. This is essential for avoiding text overlap with faces.
+
+FACE/HEAD AVOIDANCE — CRITICAL (HIGHEST PRIORITY LAYOUT RULE):
+- Before placing any text block, check if it would overlap with any face or head in the image
+- NEVER place text over a person's face or head — this overrides all other placement rules
+- If heads are in the center of the image, use top-*-safe or bottom-*-safe zones instead of center-*-safe
+- If heads span most of the image, find gaps between or above/below heads for text placement
+- In your area_analysis, explicitly note face/head positions in the face_positions field
 
 MULTI-BLOCK TEXT LAYOUTS:
 - Each variation has 1-3 text blocks placed at different positions
@@ -53,6 +61,9 @@ MULTI-BLOCK TEXT LAYOUTS:
 - Mix pill and plain styles within the same variation for contrast
 - Blocks must not overlap. Minimum 40px gap between blocks.
 - All blocks must stay within the vertical middle third (17%-83% of image height)
+- Text must not touch the image edges. Keep at least 40px horizontal margin from both sides.
+- For long text lines, prefer breaking into more lines rather than one long line that spans the full width.
+- Maximum text width should be about 85% of the image width at most.
 
 TEXT SIZING (AI decides per block):
 - "large": 72-80px primary — for stats, single punchy lines
@@ -74,6 +85,12 @@ PILL VS PLAIN — VARY across the 5 variations:
 - Some variations: all plain white text (no pills)
 - Some variations: mixed (pill on headline, plain on body, or vice versa)
 - The AI decides based on image areas, busyness, and creative variety
+
+PLAIN TEXT READABILITY — CRITICAL:
+- ONLY use plain white text (style: "plain") over DARK areas of the image (luminance < 40%)
+- If the image is predominantly light, or the specific area where plain text would go is light, use pill style instead
+- When in doubt, use pill — readability is more important than aesthetics
+- Never place white text over sky, white walls, bright concrete, or any light-coloured surface
 
 PLACEMENT — each variation uses DIFFERENT positions for its text blocks
 
@@ -106,7 +123,8 @@ Respond with this exact JSON structure:
   "area_analysis": {
     "top_third": "description",
     "middle_third": "description",
-    "bottom_third": "description"
+    "bottom_third": "description",
+    "face_positions": "Faces at approximately X%-Y% height, description of positions"
   },
   "variations": [
     {

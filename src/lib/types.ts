@@ -91,6 +91,7 @@ export interface AIResponse {
     top_third: string;
     middle_third: string;
     bottom_third: string;
+    face_positions?: string;
   };
   variations: AIVariation[];
 }

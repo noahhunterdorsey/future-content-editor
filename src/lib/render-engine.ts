@@ -20,16 +20,18 @@ const TEXT_SIZES = {
 
 type TextAlign = 'center' | 'left' | 'right';
 
+const SAFE_MARGIN_H = 40; // Minimum horizontal margin from image edges
+
 const PLACEMENT_ZONES: Record<string, { x: number; yMin: number; yMax: number; align: TextAlign }> = {
   'top-center-safe': { x: 0.5, yMin: 0.17, yMax: 0.30, align: 'center' },
-  'top-left-safe': { x: 0.10, yMin: 0.17, yMax: 0.30, align: 'left' },
-  'top-right-safe': { x: 0.90, yMin: 0.17, yMax: 0.30, align: 'right' },
+  'top-left-safe': { x: 0.12, yMin: 0.17, yMax: 0.30, align: 'left' },
+  'top-right-safe': { x: 0.88, yMin: 0.17, yMax: 0.30, align: 'right' },
   'center-safe': { x: 0.5, yMin: 0.35, yMax: 0.65, align: 'center' },
-  'center-left-safe': { x: 0.10, yMin: 0.35, yMax: 0.65, align: 'left' },
-  'center-right-safe': { x: 0.90, yMin: 0.35, yMax: 0.65, align: 'right' },
+  'center-left-safe': { x: 0.12, yMin: 0.35, yMax: 0.65, align: 'left' },
+  'center-right-safe': { x: 0.88, yMin: 0.35, yMax: 0.65, align: 'right' },
   'bottom-center-safe': { x: 0.5, yMin: 0.70, yMax: 0.83, align: 'center' },
-  'bottom-left-safe': { x: 0.10, yMin: 0.70, yMax: 0.83, align: 'left' },
-  'bottom-right-safe': { x: 0.90, yMin: 0.70, yMax: 0.83, align: 'right' },
+  'bottom-left-safe': { x: 0.12, yMin: 0.70, yMax: 0.83, align: 'left' },
+  'bottom-right-safe': { x: 0.88, yMin: 0.70, yMax: 0.83, align: 'right' },
 };
 
 interface BoundingBox {
@@ -41,16 +43,16 @@ interface BoundingBox {
 
 // WASM + font initialization
 let wasmInitialized = false;
-let interBoldBuffer: Buffer | null = null;
-let interRegularBuffer: Buffer | null = null;
+let fontBoldBuffer: Buffer | null = null;
+let fontRegularBuffer: Buffer | null = null;
 
 async function ensureInitialized() {
   // Load fonts
-  if (!interBoldBuffer) {
+  if (!fontBoldBuffer) {
     const fontDir = path.join(process.cwd(), 'public', 'fonts');
     try {
-      interBoldBuffer = fs.readFileSync(path.join(fontDir, 'Inter-Bold.ttf'));
-      interRegularBuffer = fs.readFileSync(path.join(fontDir, 'Inter-Regular.ttf'));
+      fontBoldBuffer = fs.readFileSync(path.join(fontDir, 'DMSans-Bold.ttf'));
+      fontRegularBuffer = fs.readFileSync(path.join(fontDir, 'DMSans-Regular.ttf'));
     } catch {
       console.warn('Font files not found');
     }
@@ -89,7 +91,7 @@ function escapeXml(str: string): string {
 }
 
 function estimateTextWidth(text: string, fontSize: number, isBold: boolean): number {
-  const avgCharWidth = fontSize * (isBold ? 0.62 : 0.58);
+  const avgCharWidth = fontSize * (isBold ? 0.64 : 0.60);
   let width = 0;
   for (const char of text) {
     if (char === ' ') width += fontSize * 0.28;
@@ -158,6 +160,14 @@ export async function renderTextOnImage(
   // Build SVG overlay with text blocks
   const renderedBoxes: BoundingBox[] = [];
   let svgElements = '';
+  const maxContentWidth = targetSize.width - SAFE_MARGIN_H * 2;
+
+  // SVG filter for plain text shadow (readability over light areas)
+  const svgDefs = `<defs>
+    <filter id="textShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+  </defs>`;
 
   for (const block of textBlocks) {
     const zone = PLACEMENT_ZONES[block.placement] || PLACEMENT_ZONES['center-safe'];
@@ -171,29 +181,46 @@ export async function renderTextOnImage(
     const paddingH = 20;
     const paddingV = 12;
     const pillRadius = 20;
-    const lineGap = 6;
+    const internalLineSpacing = 4; // Tight spacing within a combined pill
 
     const lineMeasurements = lines.map((line: string) => ({
       text: line,
-      width: estimateTextWidth(line, fontSize, isBold),
+      width: Math.min(estimateTextWidth(line, fontSize, isBold), maxContentWidth - paddingH * 2),
       height: fontSize * 1.2,
     }));
 
-    const totalHeight = lineMeasurements.reduce((sum: number, m: { height: number }) => sum + m.height + paddingV * 2, 0)
-      + (lines.length - 1) * lineGap;
+    // Calculate total height differently for pill vs plain
+    let totalHeight: number;
+    if (block.style === 'pill') {
+      // Unified pill: top padding + all lines + internal spacing + bottom padding
+      totalHeight = paddingV
+        + lineMeasurements.reduce((sum: number, m: { height: number }, idx: number) =>
+          sum + m.height + (idx < lineMeasurements.length - 1 ? internalLineSpacing : 0), 0)
+        + paddingV;
+    } else {
+      // Plain text: lines with normal spacing
+      const plainLineGap = 6;
+      totalHeight = lineMeasurements.reduce((sum: number, m: { height: number }) => sum + m.height, 0)
+        + (lines.length - 1) * plainLineGap;
+    }
 
     const yCenter = (zone.yMin + zone.yMax) / 2 * targetSize.height;
     let startY = yCenter - totalHeight / 2;
 
     const maxLineWidth = Math.max(...lineMeasurements.map((m: { width: number }) => m.width));
+    const blockWidth = Math.min(maxLineWidth + paddingH * 2, maxContentWidth);
+
     const blockBox: BoundingBox = {
-      x: zone.align === 'center' ? targetSize.width / 2 - (maxLineWidth + paddingH * 2) / 2 :
+      x: zone.align === 'center' ? targetSize.width / 2 - blockWidth / 2 :
          zone.align === 'left' ? zone.x * targetSize.width :
-         zone.x * targetSize.width - maxLineWidth - paddingH * 2,
+         zone.x * targetSize.width - blockWidth,
       y: startY,
-      width: maxLineWidth + paddingH * 2,
+      width: blockWidth,
       height: totalHeight,
     };
+
+    // Clamp horizontal position to safe margins
+    blockBox.x = Math.max(SAFE_MARGIN_H, Math.min(blockBox.x, targetSize.width - blockBox.width - SAFE_MARGIN_H));
 
     // Collision avoidance
     for (const existing of renderedBoxes) {
@@ -226,56 +253,77 @@ export async function renderTextOnImage(
       useDarkPill = luminance > 128;
     }
 
-    // Render each line as SVG
-    let currentY = startY;
-    for (const line of lineMeasurements) {
-      let lineX: number;
-      if (zone.align === 'center') {
-        lineX = targetSize.width / 2;
-      } else if (zone.align === 'left') {
-        lineX = zone.x * targetSize.width + paddingH;
-      } else {
-        lineX = zone.x * targetSize.width - paddingH;
+    const fontWeight = isBold ? '700' : '400';
+
+    if (block.style === 'pill') {
+      // Unified pill: one rectangle for the entire text block
+      const bgColor = useDarkPill ? '#000000' : '#FFFFFF';
+      const textColor = useDarkPill ? '#FFFFFF' : '#000000';
+      const pillX = blockBox.x;
+      const pillY = startY;
+      const pillW = blockBox.width;
+      const pillH = totalHeight;
+
+      svgElements += `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
+
+      // Draw each line of text inside the unified pill
+      let textY = startY + paddingV;
+      for (const line of lineMeasurements) {
+        let lineX: number;
+        if (zone.align === 'center') {
+          lineX = targetSize.width / 2;
+        } else if (zone.align === 'left') {
+          lineX = blockBox.x + paddingH;
+        } else {
+          lineX = blockBox.x + blockBox.width - paddingH;
+        }
+
+        const textAnchor = zone.align === 'center' ? 'middle' : zone.align === 'left' ? 'start' : 'end';
+        svgElements += `<text x="${lineX}" y="${textY + fontSize * 0.85}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+
+        textY += line.height + internalLineSpacing;
       }
+    } else {
+      // Plain text with stroke outline for readability
+      const plainLineGap = 6;
+      let textY = startY;
+      for (const line of lineMeasurements) {
+        let lineX: number;
+        if (zone.align === 'center') {
+          lineX = targetSize.width / 2;
+        } else if (zone.align === 'left') {
+          lineX = Math.max(SAFE_MARGIN_H, zone.x * targetSize.width + paddingH);
+        } else {
+          lineX = Math.min(targetSize.width - SAFE_MARGIN_H, zone.x * targetSize.width - paddingH);
+        }
 
-      const textAnchor = zone.align === 'center' ? 'middle' : zone.align === 'left' ? 'start' : 'end';
-      const fontWeight = isBold ? '700' : '400';
+        const textAnchor = zone.align === 'center' ? 'middle' : zone.align === 'left' ? 'start' : 'end';
+        const yPos = textY + fontSize * 0.85;
 
-      if (block.style === 'pill') {
-        const pillX = zone.align === 'center' ? lineX - line.width / 2 - paddingH :
-                       zone.align === 'left' ? lineX - paddingH :
-                       lineX - line.width - paddingH;
-        const pillY = currentY;
-        const pillW = line.width + paddingH * 2;
-        const pillH = line.height + paddingV * 2;
+        // Dark outline for contrast (drawn first, behind white fill)
+        svgElements += `<text x="${lineX}" y="${yPos}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        // White fill on top
+        svgElements += `<text x="${lineX}" y="${yPos}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
 
-        const bgColor = useDarkPill ? '#000000' : '#FFFFFF';
-        const textColor = useDarkPill ? '#FFFFFF' : '#000000';
-
-        svgElements += `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
-        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
-      } else {
-        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        textY += line.height + plainLineGap;
       }
-
-      currentY += line.height + paddingV * 2 + lineGap;
     }
   }
 
   // Build SVG string
-  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${targetSize.width}" height="${targetSize.height}">${svgElements}</svg>`;
+  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${targetSize.width}" height="${targetSize.height}">${svgDefs}${svgElements}</svg>`;
 
   // Render SVG to PNG using resvg with proper font support
   const fontBuffers: Uint8Array[] = [];
-  if (interBoldBuffer) fontBuffers.push(new Uint8Array(interBoldBuffer));
-  if (interRegularBuffer) fontBuffers.push(new Uint8Array(interRegularBuffer));
+  if (fontBoldBuffer) fontBuffers.push(new Uint8Array(fontBoldBuffer));
+  if (fontRegularBuffer) fontBuffers.push(new Uint8Array(fontRegularBuffer));
 
   const resvg = new Resvg(svgString, {
     fitTo: { mode: 'width' as const, value: targetSize.width },
     font: {
       fontBuffers,
       loadSystemFonts: false,
-      defaultFontFamily: 'Inter',
+      defaultFontFamily: 'DM Sans',
     },
   });
 
