@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import path from 'path';
 import fs from 'fs';
 import { TextBlock } from './types';
@@ -38,18 +39,43 @@ interface BoundingBox {
   height: number;
 }
 
-// Load Inter font as base64 for SVG embedding
-let interBoldBase64: string | null = null;
-let interRegularBase64: string | null = null;
+// WASM + font initialization
+let wasmInitialized = false;
+let interBoldBuffer: Buffer | null = null;
+let interRegularBuffer: Buffer | null = null;
 
-function loadFontBase64() {
-  if (interBoldBase64) return;
-  const fontDir = path.join(process.cwd(), 'public', 'fonts');
-  try {
-    interBoldBase64 = fs.readFileSync(path.join(fontDir, 'Inter-Bold.ttf')).toString('base64');
-    interRegularBase64 = fs.readFileSync(path.join(fontDir, 'Inter-Regular.ttf')).toString('base64');
-  } catch {
-    console.warn('Font files not found, using system fonts');
+async function ensureInitialized() {
+  // Load fonts
+  if (!interBoldBuffer) {
+    const fontDir = path.join(process.cwd(), 'public', 'fonts');
+    try {
+      interBoldBuffer = fs.readFileSync(path.join(fontDir, 'Inter-Bold.ttf'));
+      interRegularBuffer = fs.readFileSync(path.join(fontDir, 'Inter-Regular.ttf'));
+    } catch {
+      console.warn('Font files not found');
+    }
+  }
+
+  // Init WASM
+  if (!wasmInitialized) {
+    try {
+      const wasmPath = path.join(
+        process.cwd(),
+        'node_modules',
+        '@resvg',
+        'resvg-wasm',
+        'index_bg.wasm'
+      );
+      const wasmBuf = fs.readFileSync(wasmPath);
+      await initWasm(wasmBuf);
+      wasmInitialized = true;
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message?.includes('Already initialized')) {
+        wasmInitialized = true;
+      } else {
+        throw e;
+      }
+    }
   }
 }
 
@@ -62,7 +88,6 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-// Approximate text width (since we can't measure in SVG without a browser)
 function estimateTextWidth(text: string, fontSize: number, isBold: boolean): number {
   const avgCharWidth = fontSize * (isBold ? 0.62 : 0.58);
   let width = 0;
@@ -97,7 +122,7 @@ async function getImageLuminance(
   const sH = Math.min(Math.max(1, Math.floor(h)), imgHeight - sY);
 
   try {
-    const { data, info } = await sharp(imageBuffer)
+    const { data } = await sharp(imageBuffer)
       .extract({ left: sX, top: sY, width: sW, height: sH })
       .resize(1, 1, { fit: 'cover' })
       .raw()
@@ -122,7 +147,7 @@ export async function renderTextOnImage(
   textBlocks: TextBlock[],
   targetSize: Size
 ): Promise<Buffer> {
-  loadFontBase64();
+  await ensureInitialized();
 
   // Resize/crop image to target size
   const resized = await sharp(imageBuffer)
@@ -148,7 +173,6 @@ export async function renderTextOnImage(
     const pillRadius = 20;
     const lineGap = 6;
 
-    // Measure lines
     const lineMeasurements = lines.map((line: string) => ({
       text: line,
       width: estimateTextWidth(line, fontSize, isBold),
@@ -229,40 +253,37 @@ export async function renderTextOnImage(
         const textColor = useDarkPill ? '#FFFFFF' : '#000000';
 
         svgElements += `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
-        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="Inter, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
       } else {
-        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="Inter, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="Inter" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
       }
 
       currentY += line.height + paddingV * 2 + lineGap;
     }
   }
 
-  // Build complete SVG
-  const fontFaces = interBoldBase64 && interRegularBase64 ? `
-    <defs>
-      <style type="text/css">
-        @font-face {
-          font-family: 'Inter';
-          font-weight: 400;
-          src: url(data:font/truetype;base64,${interRegularBase64}) format('truetype');
-        }
-        @font-face {
-          font-family: 'Inter';
-          font-weight: 700;
-          src: url(data:font/truetype;base64,${interBoldBase64}) format('truetype');
-        }
-      </style>
-    </defs>` : '';
+  // Build SVG string
+  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${targetSize.width}" height="${targetSize.height}">${svgElements}</svg>`;
 
-  const svgOverlay = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${targetSize.width}" height="${targetSize.height}">
-    ${fontFaces}
-    ${svgElements}
-  </svg>`);
+  // Render SVG to PNG using resvg with proper font support
+  const fontBuffers: Uint8Array[] = [];
+  if (interBoldBuffer) fontBuffers.push(new Uint8Array(interBoldBuffer));
+  if (interRegularBuffer) fontBuffers.push(new Uint8Array(interRegularBuffer));
 
-  // Composite SVG overlay onto image
+  const resvg = new Resvg(svgString, {
+    fitTo: { mode: 'width' as const, value: targetSize.width },
+    font: {
+      fontBuffers,
+      loadSystemFonts: false,
+      defaultFontFamily: 'Inter',
+    },
+  });
+
+  const overlayPng = resvg.render().asPng();
+
+  // Composite the rendered text overlay onto the image
   const result = await sharp(resized)
-    .composite([{ input: svgOverlay, top: 0, left: 0 }])
+    .composite([{ input: Buffer.from(overlayPng), top: 0, left: 0 }])
     .png()
     .toBuffer();
 
