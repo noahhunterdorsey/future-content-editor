@@ -12,7 +12,7 @@ ${JSON.stringify(brandProfile, null, 2)}
 REFERENCE AD STYLE ANALYSIS:
 - Text overlaid on warehouse/team photos using Instagram Stories-style formatting
 - Mix of pill backgrounds (solid rounded rectangles) and plain white text — varies by image area and creative intent
-- Combined pill background per text block — all lines within one block share a single rounded rectangle, like Instagram Stories
+- Per-line pill backgrounds sized to each line's text width, stacked flush with no gap between lines
 - Multiple text blocks at different positions on the same image (top + bottom, or scattered across the frame) creating visual hierarchy
 - Large bold text for key stats and numbers ("3 million+"), smaller text for supporting copy
 - Deliberate line breaks at natural speech pauses, not auto-wrapped
@@ -31,7 +31,7 @@ RULES:
 - Include pricing when possible
 - Reference current offers prominently
 - Mention speed of service in at least 2 of 5 variations
-- Generate realistic Aussie customer quotes (first name + suburb)
+- Generate realistic Aussie customer quotes — never include the customer's name (no "— Dave, Richmond" style attribution). Just the quote itself.
 - No hashtags ever
 - Use emojis naturally on some variations (not all)
 - Direct response marketing — every word earns its place

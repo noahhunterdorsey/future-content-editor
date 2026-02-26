@@ -106,6 +106,27 @@ export default function LibraryPage() {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      if (res.ok) {
+        setItems(prev => prev.filter(i => i.id !== id));
+        setSelected(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error('Delete failed:', e);
+    }
+  };
+
   const selectedItems = items.filter(i => selected.has(i.id));
   const hasVideo = selectedItems.some(i => i.file_type === 'video');
   const hasImage = selectedItems.some(i => i.file_type === 'image');
@@ -131,7 +152,7 @@ export default function LibraryPage() {
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/jpeg,image/png,image/webp,video/mp4"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,.mov"
             onChange={(e) => e.target.files && handleUpload(e.target.files)}
             className="hidden"
           />
@@ -143,7 +164,7 @@ export default function LibraryPage() {
           ) : (
             <div>
               <p className="text-text-secondary text-sm">Drop files here or click to upload</p>
-              <p className="text-text-muted text-xs mt-1">JPG, PNG, WEBP, MP4</p>
+              <p className="text-text-muted text-xs mt-1">JPG, PNG, WEBP, HEIC, MP4, MOV</p>
             </div>
           )}
         </div>
@@ -173,6 +194,18 @@ export default function LibraryPage() {
                     className="w-full h-full object-cover"
                   />
                 )}
+
+                {/* Delete button — visible on hover */}
+                <div
+                  onClick={(e) => handleDelete(e, item.id)}
+                  className="absolute top-1 left-1 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center
+                    opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-red-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
 
                 {isSelected && (
                   <div className="absolute top-1 right-1 w-5 h-5 bg-accent rounded-full flex items-center justify-center">

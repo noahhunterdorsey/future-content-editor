@@ -181,7 +181,6 @@ export async function renderTextOnImage(
     const paddingH = 20;
     const paddingV = 12;
     const pillRadius = 20;
-    const internalLineSpacing = 4; // Tight spacing within a combined pill
 
     const lineMeasurements = lines.map((line: string) => ({
       text: line,
@@ -189,14 +188,12 @@ export async function renderTextOnImage(
       height: fontSize * 1.2,
     }));
 
-    // Calculate total height differently for pill vs plain
+    // Calculate total height
     let totalHeight: number;
+    const pillLineH = fontSize * 1.2 + paddingV * 2; // Each pill line height (text + top/bottom padding)
     if (block.style === 'pill') {
-      // Unified pill: top padding + all lines + internal spacing + bottom padding
-      totalHeight = paddingV
-        + lineMeasurements.reduce((sum: number, m: { height: number }, idx: number) =>
-          sum + m.height + (idx < lineMeasurements.length - 1 ? internalLineSpacing : 0), 0)
-        + paddingV;
+      // Per-line pills with no gap — each line has its own pill, stacked flush
+      totalHeight = pillLineH * lines.length;
     } else {
       // Plain text: lines with normal spacing
       const plainLineGap = 6;
@@ -256,32 +253,35 @@ export async function renderTextOnImage(
     const fontWeight = isBold ? '700' : '400';
 
     if (block.style === 'pill') {
-      // Unified pill: one rectangle for the entire text block
+      // Per-line pills: each line gets its own pill sized to its text, stacked with no gap
       const bgColor = useDarkPill ? '#000000' : '#FFFFFF';
       const textColor = useDarkPill ? '#FFFFFF' : '#000000';
-      const pillX = blockBox.x;
-      const pillY = startY;
-      const pillW = blockBox.width;
-      const pillH = totalHeight;
 
-      svgElements += `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
-
-      // Draw each line of text inside the unified pill
-      let textY = startY + paddingV;
+      let currentY = startY;
       for (const line of lineMeasurements) {
+        const pillW = line.width + paddingH * 2;
+        let pillX: number;
         let lineX: number;
         if (zone.align === 'center') {
+          pillX = targetSize.width / 2 - pillW / 2;
           lineX = targetSize.width / 2;
         } else if (zone.align === 'left') {
+          pillX = blockBox.x;
           lineX = blockBox.x + paddingH;
         } else {
+          pillX = blockBox.x + blockBox.width - pillW;
           lineX = blockBox.x + blockBox.width - paddingH;
         }
 
-        const textAnchor = zone.align === 'center' ? 'middle' : zone.align === 'left' ? 'start' : 'end';
-        svgElements += `<text x="${lineX}" y="${textY + fontSize * 0.85}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        // Clamp pill horizontally within safe margins
+        pillX = Math.max(SAFE_MARGIN_H, Math.min(pillX, targetSize.width - pillW - SAFE_MARGIN_H));
 
-        textY += line.height + internalLineSpacing;
+        const textAnchor = zone.align === 'center' ? 'middle' : zone.align === 'left' ? 'start' : 'end';
+
+        svgElements += `<rect x="${pillX}" y="${currentY}" width="${pillW}" height="${pillLineH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
+        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+
+        currentY += pillLineH; // No gap — pills stack flush
       }
     } else {
       // Plain text with stroke outline for readability
@@ -322,7 +322,7 @@ export async function renderTextOnImage(
     fitTo: { mode: 'width' as const, value: targetSize.width },
     font: {
       fontBuffers,
-      loadSystemFonts: false,
+      loadSystemFonts: true,
       defaultFontFamily: 'DM Sans',
     },
   });
