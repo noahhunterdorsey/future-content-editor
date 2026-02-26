@@ -13,6 +13,7 @@
     "@resvg/resvg-wasm": "^2.6.2",
     "@supabase/supabase-js": "^2.97.0",
     "archiver": "^7.0.1",
+    "heic-convert": "^2.1.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/archiver": "^7.0.0",
+    "@types/heic-convert": "^2.1.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

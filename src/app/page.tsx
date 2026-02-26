@@ -50,6 +50,9 @@ export default function LibraryPage() {
       console.error('Upload failed:', e);
     } finally {
       setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 

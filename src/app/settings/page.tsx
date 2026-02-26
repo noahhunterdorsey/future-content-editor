@@ -58,14 +58,16 @@ export default function SettingsPage() {
 
   const handleUploadReference = async (files: FileList) => {
     setUploading(true);
-    for (const file of Array.from(files)) {
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        await fetch('/api/reference-ads', { method: 'POST', body: formData });
-      } catch (e) {
-        console.error('Upload failed:', e);
-      }
+    try {
+      await Promise.all(
+        Array.from(files).map(async (file) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          await fetch('/api/reference-ads', { method: 'POST', body: formData });
+        })
+      );
+    } catch (e) {
+      console.error('Upload failed:', e);
     }
     await fetchReferenceAds();
     setUploading(false);
