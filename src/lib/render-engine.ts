@@ -51,8 +51,8 @@ async function ensureInitialized() {
   if (!fontBoldBuffer) {
     const fontDir = path.join(process.cwd(), 'public', 'fonts');
     try {
-      fontBoldBuffer = fs.readFileSync(path.join(fontDir, 'DMSans-Bold.ttf'));
-      fontRegularBuffer = fs.readFileSync(path.join(fontDir, 'DMSans-Regular.ttf'));
+      fontBoldBuffer = fs.readFileSync(path.join(fontDir, 'Roboto-Bold.ttf'));
+      fontRegularBuffer = fs.readFileSync(path.join(fontDir, 'Roboto-Regular.ttf'));
     } catch {
       console.warn('Font files not found');
     }
@@ -91,7 +91,7 @@ function escapeXml(str: string): string {
 }
 
 function estimateTextWidth(text: string, fontSize: number, isBold: boolean): number {
-  const avgCharWidth = fontSize * (isBold ? 0.64 : 0.60);
+  const avgCharWidth = fontSize * (isBold ? 0.60 : 0.56);
   let width = 0;
   for (const char of text) {
     if (char === ' ') width += fontSize * 0.28;
@@ -178,9 +178,8 @@ export async function renderTextOnImage(
     const processedText = applyCapitalization(block.text, block.capitalization);
     const lines = processedText.split('\\n').flatMap((l: string) => l.split('\n'));
 
-    const paddingH = 20;
-    const paddingV = 12;
-    const pillRadius = 20;
+    const paddingH = 16;
+    const paddingV = 8;
 
     const lineMeasurements = lines.map((line: string) => ({
       text: line,
@@ -261,25 +260,24 @@ export async function renderTextOnImage(
       for (const line of lineMeasurements) {
         const pillW = line.width + paddingH * 2;
         let pillX: number;
-        let lineX: number;
         if (zone.align === 'center') {
           pillX = targetSize.width / 2 - pillW / 2;
-          lineX = targetSize.width / 2;
         } else if (zone.align === 'left') {
           pillX = blockBox.x;
-          lineX = blockBox.x + paddingH;
         } else {
           pillX = blockBox.x + blockBox.width - pillW;
-          lineX = blockBox.x + blockBox.width - paddingH;
         }
 
         // Clamp pill horizontally within safe margins
         pillX = Math.max(SAFE_MARGIN_H, Math.min(pillX, targetSize.width - pillW - SAFE_MARGIN_H));
 
-        const textAnchor = zone.align === 'center' ? 'middle' : zone.align === 'left' ? 'start' : 'end';
+        // Text positioned at exact center of pill
+        const textX = pillX + pillW / 2;
+        const textY = currentY + pillLineH / 2;
 
+        const pillRadius = pillLineH / 2; // Full capsule shape like Instagram
         svgElements += `<rect x="${pillX}" y="${currentY}" width="${pillW}" height="${pillLineH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
-        svgElements += `<text x="${lineX}" y="${currentY + paddingV + fontSize * 0.85}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${textX}" y="${textY}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="middle" dominant-baseline="central">${escapeXml(line.text)}</text>`;
 
         currentY += pillLineH; // No gap — pills stack flush
       }
@@ -301,9 +299,9 @@ export async function renderTextOnImage(
         const yPos = textY + fontSize * 0.85;
 
         // Dark outline for contrast (drawn first, behind white fill)
-        svgElements += `<text x="${lineX}" y="${yPos}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${lineX}" y="${yPos}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="none" stroke="#000000" stroke-width="4" stroke-linejoin="round" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
         // White fill on top
-        svgElements += `<text x="${lineX}" y="${yPos}" font-family="DM Sans" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
+        svgElements += `<text x="${lineX}" y="${yPos}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="#FFFFFF" text-anchor="${textAnchor}">${escapeXml(line.text)}</text>`;
 
         textY += line.height + plainLineGap;
       }
@@ -323,7 +321,7 @@ export async function renderTextOnImage(
     font: {
       fontBuffers,
       loadSystemFonts: true,
-      defaultFontFamily: 'DM Sans',
+      defaultFontFamily: 'Roboto',
     },
   });
 
