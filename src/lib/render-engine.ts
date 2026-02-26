@@ -173,7 +173,7 @@ export async function renderTextOnImage(
     const zone = PLACEMENT_ZONES[block.placement] || PLACEMENT_ZONES['center-safe'];
     const sizes = TEXT_SIZES[block.text_size] || TEXT_SIZES['standard'];
     const fontSize = sizes.primary;
-    const isBold = block.capitalization === 'upper' || block.text_size === 'large';
+    const isBold = true; // Always bold
 
     const processedText = applyCapitalization(block.text, block.capitalization);
     const lines = processedText.split('\\n').flatMap((l: string) => l.split('\n'));
@@ -249,7 +249,7 @@ export async function renderTextOnImage(
       useDarkPill = luminance > 128;
     }
 
-    const fontWeight = isBold ? '700' : '400';
+    const fontWeight = '700'; // Always bold
 
     if (block.style === 'pill') {
       // Per-line pills: each line gets its own pill sized to its text, stacked with no gap
@@ -275,7 +275,7 @@ export async function renderTextOnImage(
         const textX = pillX + pillW / 2;
         const textY = currentY + pillLineH / 2;
 
-        const pillRadius = pillLineH / 2; // Full capsule shape like Instagram
+        const pillRadius = 10; // Slightly rounded corners, more squared up
         svgElements += `<rect x="${pillX}" y="${currentY}" width="${pillW}" height="${pillLineH}" rx="${pillRadius}" ry="${pillRadius}" fill="${bgColor}"/>`;
         svgElements += `<text x="${textX}" y="${textY}" font-family="Roboto" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textColor}" text-anchor="middle" dominant-baseline="central">${escapeXml(line.text)}</text>`;
 
